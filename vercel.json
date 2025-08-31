@@ -1,6 +1,8 @@
 {
   "version": 2,
   "name": "smart-library-api",
+  "buildCommand": "echo 'API project - no build needed'",
+  "outputDirectory": ".",
   "functions": {
     "api/**/*.js": {
       "maxDuration": 30

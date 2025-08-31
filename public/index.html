@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能图书馆API服务</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            max-width: 500px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 1rem;
+            font-size: 2rem;
+        }
+        p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+        }
+        .api-link {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 0.5rem;
+            transition: background 0.3s;
+        }
+        .api-link:hover {
+            background: #5a67d8;
+        }
+        .status {
+            background: #48bb78;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            display: inline-block;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="status">✅ API服务运行正常</div>
+        <h1>🚀 智能图书馆API</h1>
+        <p>欢迎访问智能图书馆API服务！这是一个为微信小程序提供图书管理功能的后端服务。</p>
+        
+        <div>
+            <a href="/api" class="api-link">📋 API信息</a>
+            <a href="/api/test" class="api-link">🧪 功能测试</a>
+            <a href="/api/books/categories" class="api-link">📚 图书分类</a>
+            <a href="/api/books/hot" class="api-link">🔥 热门图书</a>
+        </div>
+        
+        <p style="margin-top: 2rem; font-size: 0.9rem; color: #888;">
+            智能图书馆系统 v1.0.0<br>
+            部署于 Vercel Serverless Functions
+        </p>
+    </div>
+</body>
+</html>
