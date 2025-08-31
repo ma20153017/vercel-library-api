@@ -3,9 +3,7 @@
   "name": "smart-library-api",
   "functions": {
     "api/**/*.js": {
-      "runtime": "nodejs18.x",
-      "maxDuration": 30,
-      "memory": 1024
+      "maxDuration": 30
     }
   },
   "rewrites": [
