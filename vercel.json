@@ -9,8 +9,16 @@
   ],
   "routes": [
     {
+      "src": "/api",
+      "dest": "/api/index.js"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/$1"
+    },
+    {
+      "src": "/",
+      "dest": "/api/index.js"
     }
   ],
   "env": {
