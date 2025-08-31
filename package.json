@@ -1,0 +1,29 @@
+{
+  "name": "smart-library-api",
+  "version": "1.0.0",
+  "description": "智能图书馆API服务",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'Build complete'",
+    "start": "echo 'Production server running'"
+  },
+  "dependencies": {
+    "wx-server-sdk": "^3.0.0"
+  },
+  "devDependencies": {
+    "@vercel/node": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "library",
+    "wechat",
+    "miniprogram",
+    "api",
+    "vercel"
+  ],
+  "author": "Smart Library Team",
+  "license": "MIT"
+}
