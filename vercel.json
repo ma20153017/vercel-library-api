@@ -38,7 +38,7 @@
     }
   ],
   "env": {
-    "WX_ENV_ID": "@wx_env_id",
+    "WX_ENV_ID": "education-1geprlt378fa237c",
     "NODE_ENV": "production"
   }
 } 
