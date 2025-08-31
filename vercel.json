@@ -8,24 +8,16 @@
       "memory": 1024
     }
   },
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api",
-      "dest": "/api/index.js"
+      "source": "/",
+      "destination": "/api/index"
     },
     {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
-    },
-    {
-      "src": "/",
-      "dest": "/api/index.js"
+      "source": "/api",
+      "destination": "/api/index"
     }
   ],
-  "env": {
-    "WX_ENV_ID": "@wx_env_id",
-    "NODE_ENV": "production"
-  },
   "headers": [
     {
       "source": "/api/(.*)",
@@ -44,5 +36,9 @@
         }
       ]
     }
-  ]
+  ],
+  "env": {
+    "WX_ENV_ID": "@wx_env_id",
+    "NODE_ENV": "production"
+  }
 } 
