@@ -1,7 +1,7 @@
 // api/users/status.js - 获取用户借阅状态接口
-import { connectToDatabase } from '../../lib/database.js';
+const { getCollection, handleDatabaseError, cacheManager, ObjectId } = require('../../lib/database');
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   try {
     // 设置CORS头
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -20,24 +20,31 @@ export default async function handler(req, res) {
     }
 
     // 获取用户ID
-    const { userId, studentId } = req.query;
+    const { userId, studentId, openid } = req.query;
     
-    if (!userId && !studentId) {
+    if (!userId && !studentId && !openid) {
       return res.status(400).json({
         success: false,
-        error: '缺少用户ID或学号参数',
-        details: '请提供userId或studentId参数'
+        error: '缺少用户标识参数',
+        details: '请提供userId、studentId或openid参数'
       });
     }
 
-    // 连接数据库
-    const db = await connectToDatabase();
-    
-    if (!db) {
-      throw new Error('数据库连接失败');
-    }
+    console.log(`👤 开始获取用户状态数据: ${userId || studentId || openid}`);
 
-    console.log(`👤 开始获取用户状态数据: ${userId || studentId}`);
+    // 检查缓存
+    const cacheKey = `user_status_${userId || studentId || openid}`;
+    const cachedData = cacheManager.get(cacheKey);
+    
+    if (cachedData) {
+      console.log('✅ 从缓存获取用户状态数据');
+      return res.status(200).json({
+        success: true,
+        data: cachedData,
+        cached: true,
+        timestamp: new Date().toISOString()
+      });
+    }
 
     // 构建用户查询条件
     let userQuery = {};
@@ -47,25 +54,32 @@ export default async function handler(req, res) {
     if (studentId) {
       userQuery.studentId = studentId;
     }
+    if (openid) {
+      userQuery.openid = openid;
+    }
+
+    // 获取集合
+    const borrowsCollection = await getCollection('borrows');
+    const favoritesCollection = await getCollection('favorites');
+    const usersCollection = await getCollection('users');
 
     // 并行查询用户相关数据
-    const [borrowRecords, favoriteRecords] = await Promise.all([
+    const [borrowRecords, favoriteRecords, userInfo] = await Promise.all([
       // 查询借阅记录
-      db.collection('borrowRecords')
-        .where(userQuery)
-        .get(),
+      borrowsCollection.find(userQuery).toArray(),
       
       // 查询收藏记录
-      db.collection('userFavorites')
-        .where(userQuery)
-        .get()
+      favoritesCollection.find(userQuery).toArray(),
+      
+      // 查询用户基本信息
+      usersCollection.findOne(userQuery)
     ]);
 
-    console.log(`📖 找到 ${borrowRecords.data.length} 条借阅记录`);
-    console.log(`❤️ 找到 ${favoriteRecords.data.length} 条收藏记录`);
+    console.log(`📖 找到 ${borrowRecords.length} 条借阅记录`);
+    console.log(`❤️ 找到 ${favoriteRecords.length} 条收藏记录`);
 
     // 处理借阅数据
-    const allBorrows = borrowRecords.data || [];
+    const allBorrows = borrowRecords || [];
     const currentBorrows = allBorrows.filter(record => record.status === 'borrowed');
     const overdueBooks = currentBorrows.filter(record => {
       if (!record.dueDate) return false;
@@ -74,7 +88,7 @@ export default async function handler(req, res) {
     });
 
     // 处理收藏数据
-    const favoriteBooks = favoriteRecords.data || [];
+    const favoriteBooks = favoriteRecords || [];
 
     // 计算借阅统计
     const borrowStats = {
@@ -114,19 +128,35 @@ export default async function handler(req, res) {
       activityScore = Math.round((onTimeRate * 0.6 + borrowFrequency * 0.4) * 100);
     }
 
+    // 获取偏好分类
+    const preferredCategories = await getPreferredCategories(allBorrows);
+
     const userStatus = {
       // 基础统计
       ...borrowStats,
       
+      // 用户基本信息
+      userInfo: userInfo ? {
+        name: userInfo.name || '未设置',
+        studentId: userInfo.studentId || '',
+        avatar: userInfo.avatar || '',
+        joinDate: userInfo.createdAt || new Date().toISOString()
+      } : null,
+      
       // 详细信息
       recentBorrows: recentBorrows.map(record => ({
+        id: record._id?.toString(),
         bookId: record.bookId,
+        bookTitle: record.bookTitle || '',
         borrowDate: record.borrowDate,
+        dueDate: record.dueDate,
         status: record.status
       })),
       
       upcomingDue: upcomingDue.map(record => ({
+        id: record._id?.toString(),
         bookId: record.bookId,
+        bookTitle: record.bookTitle || '',
         dueDate: record.dueDate,
         daysUntilDue: record.daysUntilDue
       })),
@@ -135,7 +165,7 @@ export default async function handler(req, res) {
       activityScore,
       
       // 推荐类别（基于借阅历史）
-      preferredCategories: await getPreferredCategories(db, allBorrows),
+      preferredCategories,
       
       // 时间戳
       lastUpdated: new Date().toISOString()
@@ -149,64 +179,107 @@ export default async function handler(req, res) {
         totalBorrows: 0,
         favoriteBooks: 0,
         returnedBooks: 0,
+        userInfo: userInfo ? {
+          name: userInfo.name || '新用户',
+          studentId: userInfo.studentId || '',
+          avatar: userInfo.avatar || '',
+          joinDate: userInfo.createdAt || new Date().toISOString()
+        } : {
+          name: '新用户',
+          studentId: studentId || '',
+          avatar: '',
+          joinDate: new Date().toISOString()
+        },
         recentBorrows: [],
         upcomingDue: [],
         activityScore: 0,
         preferredCategories: [],
         isNewUser: true,
+        recommendations: [
+          { category: '技术', reason: '热门分类推荐' },
+          { category: '文学', reason: '经典阅读推荐' },
+          { category: '科学', reason: '知识拓展推荐' }
+        ],
         lastUpdated: new Date().toISOString()
       };
+
+      // 缓存结果（1分钟，新用户数据变化较快）
+      cacheManager.set(cacheKey, defaultStatus, 60000);
+
+      console.log('📝 返回新用户默认状态');
 
       return res.status(200).json({
         success: true,
         data: defaultStatus,
         message: '新用户，返回默认状态',
+        cached: false,
         timestamp: new Date().toISOString()
       });
     }
+
+    // 缓存结果（3分钟）
+    cacheManager.set(cacheKey, userStatus, 180000);
 
     console.log(`✅ 成功获取用户状态数据`);
 
     return res.status(200).json({
       success: true,
       data: userStatus,
-      query: { userId, studentId },
+      cached: false,
+      query: { userId, studentId, openid },
       timestamp: new Date().toISOString()
     });
 
   } catch (error) {
     console.error('❌ 获取用户状态失败:', error);
     
+    const errorResponse = handleDatabaseError(error, '获取用户状态');
+    
     return res.status(500).json({
       success: false,
-      error: '获取用户状态失败',
-      details: error.message,
+      error: errorResponse.error,
+      code: errorResponse.code,
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
       timestamp: new Date().toISOString()
     });
   }
-}
+};
 
 // 辅助函数：获取用户偏好分类
-async function getPreferredCategories(db, borrowRecords) {
+async function getPreferredCategories(borrowRecords) {
   try {
     if (borrowRecords.length === 0) return [];
 
+    // 获取books集合
+    const booksCollection = await getCollection('books');
+
     // 获取所有借阅的图书ID
-    const bookIds = borrowRecords.map(record => record.bookId);
-    
+    const bookIds = borrowRecords
+      .map(record => {
+        try {
+          return typeof record.bookId === 'string' 
+            ? new ObjectId(record.bookId) 
+            : record.bookId;
+        } catch (err) {
+          console.warn('无效的图书ID:', record.bookId);
+          return null;
+        }
+      })
+      .filter(id => id !== null);
+
+    if (bookIds.length === 0) return [];
+
     // 查询这些图书的分类信息
-    const booksResult = await db.collection('books')
-      .where({
-        _id: db.command.in(bookIds)
-      })
-      .field({
-        category: true
-      })
-      .get();
+    const books = await booksCollection
+      .find(
+        { _id: { $in: bookIds } },
+        { projection: { category: 1, _id: 1 } }
+      )
+      .toArray();
 
     // 统计分类频率
     const categoryCount = {};
-    booksResult.data.forEach(book => {
+    books.forEach(book => {
       if (book.category) {
         categoryCount[book.category] = (categoryCount[book.category] || 0) + 1;
       }
@@ -227,4 +300,3 @@ async function getPreferredCategories(db, borrowRecords) {
     return [];
   }
 }
-

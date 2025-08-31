@@ -9,6 +9,7 @@
     "start": "echo 'Production server running'"
   },
   "dependencies": {
+    "mongodb": "^6.0.0",
     "wx-server-sdk": "^3.0.0"
   },
   "devDependencies": {

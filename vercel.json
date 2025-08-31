@@ -38,7 +38,8 @@
     }
   ],
   "env": {
-    "WX_ENV_ID": "education-1geprlt378fa237c",
+    "MONGODB_URI": "mongodb+srv://ma20153017_db_user:dz4o48EV2ACF4C24@smart-library-cluster.zqouztr.mongodb.net/?retryWrites=true&w=majority&appName=smart-library-cluster",
+    "DB_NAME": "smart_library",
     "NODE_ENV": "production"
   }
 } 

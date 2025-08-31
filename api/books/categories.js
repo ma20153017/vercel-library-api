@@ -1,7 +1,7 @@
 // api/books/categories.js - 获取图书分类接口
-import { connectToDatabase } from '../../lib/database.js';
+const { getCollection, handleDatabaseError, cacheManager } = require('../../lib/database');
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   try {
     // 设置CORS头
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -19,17 +19,28 @@ export default async function handler(req, res) {
       });
     }
 
-    // 连接数据库
-    const db = await connectToDatabase();
-    
-    if (!db) {
-      throw new Error('数据库连接失败');
-    }
-
     console.log('🔍 开始获取图书分类数据...');
 
+    // 检查缓存
+    const cacheKey = 'book_categories';
+    const cachedData = cacheManager.get(cacheKey);
+    
+    if (cachedData) {
+      console.log('✅ 从缓存获取分类数据');
+      return res.status(200).json({
+        success: true,
+        data: cachedData,
+        total: cachedData.length,
+        cached: true,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // 获取books集合
+    const booksCollection = await getCollection('books');
+
     // 从books集合中聚合分类数据
-    const categoriesResult = await db.collection('books')
+    const categoriesResult = await booksCollection
       .aggregate([
         {
           $group: {
@@ -56,9 +67,9 @@ export default async function handler(req, res) {
           $sort: { count: -1 }
         }
       ])
-      .get();
+      .toArray();
 
-    console.log('📊 分类聚合结果:', categoriesResult.data);
+    console.log('📊 分类聚合结果:', categoriesResult);
 
     // 处理分类数据，添加图标映射
     const iconMapping = {
@@ -83,7 +94,7 @@ export default async function handler(req, res) {
       '其他': '📋'
     };
 
-    const categories = categoriesResult.data.map(cat => ({
+    let categories = categoriesResult.map(cat => ({
       id: cat.id,
       name: cat.name,
       icon: iconMapping[cat.name] || '📋',
@@ -102,13 +113,12 @@ export default async function handler(req, res) {
         { id: 'education', name: '教育', icon: '🎓', count: 0, subcategories: [] }
       ];
       
-      return res.status(200).json({
-        success: true,
-        data: defaultCategories,
-        total: defaultCategories.length,
-        message: '返回默认分类数据'
-      });
+      categories = defaultCategories;
+      console.log('📝 使用默认分类数据');
     }
+
+    // 缓存结果（5分钟）
+    cacheManager.set(cacheKey, categories, 300000);
 
     console.log(`✅ 成功获取 ${categories.length} 个图书分类`);
 
@@ -116,18 +126,21 @@ export default async function handler(req, res) {
       success: true,
       data: categories,
       total: categories.length,
+      cached: false,
       timestamp: new Date().toISOString()
     });
 
   } catch (error) {
     console.error('❌ 获取图书分类失败:', error);
     
+    const errorResponse = handleDatabaseError(error, '获取图书分类');
+    
     return res.status(500).json({
       success: false,
-      error: '获取图书分类失败',
-      details: error.message,
+      error: errorResponse.error,
+      code: errorResponse.code,
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
       timestamp: new Date().toISOString()
     });
   }
-}
-
+};
